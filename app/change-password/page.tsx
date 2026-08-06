@@ -42,8 +42,8 @@ export default function ChangePasswordPage() {
       <div className="auth-card fade-in">
         <div className="auth-card-header">
           <div className="auth-logo">
-            <div className="auth-logo-mark">SA</div>
-            <div className="auth-logo-name">Symbi Assess</div>
+            <div className="auth-logo-mark">DW</div>
+            <div className="auth-logo-name">Exam Studio</div>
           </div>
           <h2>Set your password</h2>
           <p>Choose a new password to secure your account</p>

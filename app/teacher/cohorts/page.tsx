@@ -165,10 +165,10 @@ function CohortDetail({ cohort, members, onBack, onMembersChange, onRemove, onRe
 
   function downloadTemplate() {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['full_name', 'email', 'phone'],
-      ['Rahul Sharma', 'rahul.sharma@gmail.com', '9876543210'],
+      ['full_name', 'email', 'phone', 'prn_id'],
+      ['Rahul Sharma', 'rahul.sharma@gmail.com', '9876543210', 'PRN2025001'],
     ])
-    ws['!cols'] = [{ wch: 24 }, { wch: 32 }, { wch: 14 }]
+    ws['!cols'] = [{ wch: 24 }, { wch: 32 }, { wch: 14 }, { wch: 16 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Students')
     XLSX.writeFile(wb, 'student_upload_template.xlsx')
@@ -212,11 +212,12 @@ function CohortDetail({ cohort, members, onBack, onMembersChange, onRemove, onRe
         ) : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Name</th><th>PRN ID</th><th>Email</th><th>Phone</th><th>Actions</th></tr></thead>
               <tbody>
                 {members.map((m: any) => (
                   <tr key={m.id}>
                     <td><div style={{ fontWeight: 600 }}>{m.profile?.full_name}</div></td>
+                    <td style={{ color: 'var(--slate-500)' }}>{m.profile?.prn_id || '—'}</td>
                     <td style={{ color: 'var(--slate-500)' }}>{m.profile?.email}</td>
                     <td style={{ color: 'var(--slate-500)' }}>{m.profile?.phone || '—'}</td>
                     <td>
@@ -340,6 +341,7 @@ function BulkUploadModal({ cohortId, cohortName, onClose, onDone }: any) {
         full_name: r['full_name'] || r['Full Name'] || r['name'] || '',
         email: r['email'] || r['Email'] || '',
         phone: r['phone'] || r['Phone'] || '',
+        prn_id: r['prn_id'] || r['PRN ID'] || r['PRN'] || '',
       })).filter(r => r.full_name && r.email)
       setRows(parsed)
     }
@@ -362,7 +364,7 @@ function BulkUploadModal({ cohortId, cohortName, onClose, onDone }: any) {
         <div className="modal-body">
           {results.length === 0 ? (
             <>
-              <div className="alert alert-info"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Excel must have columns: <strong>full_name</strong>, <strong>email</strong>, <strong>phone</strong> (optional)</div>
+              <div className="alert alert-info"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Excel must have columns: <strong>full_name</strong>, <strong>email</strong>, <strong>phone</strong> (optional), <strong>prn_id</strong> (optional)</div>
               <div className="upload-zone" onClick={() => fileRef.current?.click()}>
                 <div className="upload-zone-icon"><svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg></div>
                 <p><strong>Click to upload</strong> or drag and drop</p>
@@ -373,8 +375,8 @@ function BulkUploadModal({ cohortId, cohortName, onClose, onDone }: any) {
                 <div style={{ marginTop: 16 }}>
                   <div className="badge badge-green" style={{ marginBottom: 10 }}>{rows.length} students parsed</div>
                   <div style={{ maxHeight: 200, overflow: 'auto' }}>
-                    <table className="table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th></tr></thead>
-                      <tbody>{rows.map((r, i) => <tr key={i}><td>{r.full_name}</td><td>{r.email}</td><td>{r.phone || '—'}</td></tr>)}</tbody>
+                    <table className="table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>PRN ID</th></tr></thead>
+                      <tbody>{rows.map((r, i) => <tr key={i}><td>{r.full_name}</td><td>{r.email}</td><td>{r.phone || '—'}</td><td>{r.prn_id || '—'}</td></tr>)}</tbody>
                     </table>
                   </div>
                 </div>

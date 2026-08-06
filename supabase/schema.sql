@@ -13,6 +13,7 @@ create table public.profiles (
   full_name     text not null,
   email         text not null unique,
   phone         text,
+  prn_id        text,
   role          text not null check (role in ('teacher','student')) default 'student',
   avatar_url    text,
   must_change_password boolean default false,

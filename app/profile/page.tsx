@@ -121,6 +121,13 @@ export default function ProfilePage() {
                 <label className="form-label">Email address</label>
                 <input className="form-input" value={profile.email} disabled style={{ background: 'var(--slate-50)', color: 'var(--slate-400)' }} />
               </div>
+              {profile.prn_id && (
+                <div className="form-group">
+                  <label className="form-label">PRN ID</label>
+                  <input className="form-input" value={profile.prn_id} disabled style={{ background: 'var(--slate-50)', color: 'var(--slate-400)' }} />
+                  <span className="form-hint">PRN ID is assigned by your administrator and cannot be changed.</span>
+                </div>
+              )}
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Phone number</label>
                 <input className="form-input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 9876543210" />

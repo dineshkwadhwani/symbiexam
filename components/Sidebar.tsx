@@ -66,10 +66,9 @@ export default function Sidebar({ profile, open, onClose }: Props) {
       {open && <div className="sidebar-overlay" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="sidebar-logo-mark">SA</div>
+          <div className="sidebar-logo-mark">DW</div>
           <div>
-            <div className="sidebar-logo-text">Symbi Assess</div>
-            <div className="sidebar-logo-sub">SIT · F0003</div>
+            <div className="sidebar-logo-text">Exam Studio</div>
           </div>
         </div>
 

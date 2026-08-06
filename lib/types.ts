@@ -5,6 +5,7 @@ export interface Profile {
   full_name: string
   email: string
   phone?: string
+  prn_id?: string
   role: Role
   avatar_url?: string
   must_change_password: boolean

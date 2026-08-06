@@ -1,7 +1,9 @@
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM = process.env.RESEND_FROM_EMAIL || 'assessments@yourdomain.com'
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'assessments@yourdomain.com'
+const FROM_NAME = process.env.RESEND_FROM_NAME || 'Exam Studio'
+const FROM = FROM_NAME ? `${FROM_NAME} <${FROM_EMAIL}>` : FROM_EMAIL
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 export async function sendWelcomeEmail(
@@ -72,6 +74,38 @@ export async function sendPasswordResetEmail(to: string, name: string, newPasswo
               Log in now →
             </a>
             <p style="color: #94a3b8; font-size: 12px; margin: 24px 0 0;">If you did not expect this, contact your teacher immediately.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  })
+}
+
+export async function sendCohortAddedEmail(to: string, name: string, cohortName: string) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `You've been added to ${cohortName}`,
+    html: `
+      <div style="font-family: Inter, sans-serif; max-width: 540px; margin: 0 auto; background: #f8fafc; padding: 32px 16px;">
+        <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="background: linear-gradient(135deg, #2563eb, #1e40af); padding: 28px 32px; color: white;">
+            <div style="font-size: 22px; font-weight: 800; margin-bottom: 4px;">Exam Studio</div>
+          </div>
+          <div style="padding: 28px 32px;">
+            <h2 style="color: #1e293b; margin: 0 0 16px;">Hello, ${name}!</h2>
+            <p style="color: #475569; line-height: 1.6; margin: 0 0 20px;">
+              You have been added to a new cohort: <strong>${cohortName}</strong>.
+            </p>
+            <p style="color: #475569; line-height: 1.6; margin: 0 0 20px;">
+              Log in using your existing credentials to access your dashboard.
+            </p>
+            <a href="${APP_URL}/login" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              Go to Dashboard →
+            </a>
+          </div>
+          <div style="padding: 16px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+            <p style="color: #94a3b8; font-size: 12px; margin: 0;">If you did not expect this, please contact your teacher.</p>
           </div>
         </div>
       </div>

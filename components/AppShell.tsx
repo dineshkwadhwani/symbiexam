@@ -18,7 +18,7 @@ export default function AppShell({ profile, children }: Props) {
         <button className="topbar-menu-btn" onClick={() => setSidebarOpen(true)}>
           <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
-        <span className="topbar-title">Symbi Assess</span>
+        <span className="topbar-title">Exam Studio</span>
       </div>
       <main className="main-content">
         {children}

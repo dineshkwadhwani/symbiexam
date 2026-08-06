@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendWelcomeEmail } from '@/lib/email'
+import { sendWelcomeEmail, sendCohortAddedEmail } from '@/lib/email'
 import { generatePassword } from '@/lib/auth'
 
 interface StudentRow {
   full_name: string
   email: string
   phone?: string
+  prn_id?: string
 }
 
 export async function POST(req: NextRequest) {
@@ -26,14 +27,15 @@ export async function POST(req: NextRequest) {
 
         if (existing) {
           userId = existing.id
-          const { data: profile } = await admin.from('profiles').select('id').eq('id', userId).single()
+          const { data: profile } = await admin.from('profiles').select('id, full_name').eq('id', userId).single()
           if (!profile) {
             await admin.from('profiles').insert({
-              id: userId, full_name: s.full_name, email: s.email, phone: s.phone,
+              id: userId, full_name: s.full_name, email: s.email, phone: s.phone, prn_id: s.prn_id,
               role: 'student', must_change_password: false
             })
           }
           await admin.from('cohort_students').insert({ cohort_id, student_id: userId }).select()
+          try { await sendCohortAddedEmail(s.email, profile?.full_name ?? s.full_name, cohort_name) } catch {}
           results.push({ email: s.email, status: 'exists' })
         } else {
           const pw = generatePassword()
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
             full_name: s.full_name,
             email: s.email,
             phone: s.phone,
+            prn_id: s.prn_id,
             role: 'student',
             must_change_password: true,
           })

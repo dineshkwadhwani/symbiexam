@@ -3,7 +3,7 @@ import './globals.css'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
-  title: 'Symbi Assess',
+  title: 'Exam Studio',
   description: 'Assessment Platform — Symbiosis Institute of Technology',
 }
 
