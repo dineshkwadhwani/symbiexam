@@ -661,9 +661,9 @@ p { margin-bottom: 0; }
 .auth-logo-name {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.4rem;
 }
-.auth-card-header h2 { font-size: 1.4rem; margin-bottom: 6px; }
+.auth-card-header h2 { font-size: 1.1rem; margin-bottom: 6px; }
 .auth-card-header p { opacity: 0.8; font-size: 0.85rem; }
 .auth-card-body { padding: 28px 32px 32px; }
 
