@@ -8,15 +8,27 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('assessments')
-    .select('*, questions(count)')
+    .select('*')
     .eq('teacher_id', user.id)
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
+  // Count questions per assessment in a single query
+  const assessmentIds = data.map(a => a.id)
+  const { data: qCounts } = await supabase
+    .from('questions')
+    .select('assessment_id')
+    .in('assessment_id', assessmentIds)
+
+  const countMap: Record<string, number> = {}
+  for (const q of qCounts ?? []) {
+    countMap[q.assessment_id] = (countMap[q.assessment_id] ?? 0) + 1
+  }
+
   const assessments = data.map(a => ({
     ...a,
-    question_count: a.questions?.[0]?.count ?? 0,
+    question_count: countMap[a.id] ?? 0,
   }))
 
   return NextResponse.json({ assessments })

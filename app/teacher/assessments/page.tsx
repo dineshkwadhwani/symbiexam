@@ -16,6 +16,7 @@ export default function AssessmentsPage() {
   const [tryModal, setTryModal] = useState<Assessment | null>(null)
   const [uploadModal, setUploadModal] = useState<Assessment | null>(null)
   const [reviewModal, setReviewModal] = useState<Assessment | null>(null)
+  const [editModal, setEditModal] = useState<Assessment | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -133,6 +134,9 @@ export default function AssessmentsPage() {
                 <button className="btn btn-ghost btn-sm" style={{ color: 'var(--blue-600)' }} onClick={() => setTryModal(a)}>
                   Try Now
                 </button>
+                <button className="btn btn-ghost btn-sm" style={{ color: 'var(--slate-600)' }} onClick={() => setEditModal(a)}>
+                  Edit
+                </button>
                 <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red-600)', marginLeft: 'auto' }} onClick={() => deleteAssessment(a)}>
                   Delete
                 </button>
@@ -164,6 +168,13 @@ export default function AssessmentsPage() {
       )}
       {tryModal && (
         <TryAssessmentModal assessment={tryModal} onClose={() => setTryModal(null)} />
+      )}
+      {editModal && (
+        <EditAssessmentModal
+          assessment={editModal}
+          onClose={() => setEditModal(null)}
+          onUpdated={updated => { setAssessments(list => list.map(x => x.id === updated.id ? updated : x)); setEditModal(null) }}
+        />
       )}
       {reviewModal && (
         <ReviewQuestionsModal
@@ -512,6 +523,73 @@ function TryAssessmentModal({ assessment, onClose }: any) {
             <button className="btn btn-primary" onClick={() => setSubmitted(true)}>Submit</button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function EditAssessmentModal({ assessment, onClose, onUpdated }: any) {
+  const [form, setForm] = useState({
+    name: assessment.name,
+    total_questions: assessment.total_questions,
+    total_time_seconds: assessment.total_time_seconds ?? '',
+    time_per_question: assessment.time_per_question ?? '',
+    marks_per_correct: assessment.marks_per_correct,
+    total_marks: assessment.total_marks,
+    is_active: assessment.is_active,
+  })
+  const [loading, setLoading] = useState(false)
+
+  const f = (k: string) => (e: any) => setForm(x => ({ ...x, [k]: e.target.value }))
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    const res = await fetch(`/api/assessments/${assessment.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name,
+        total_questions: Number(form.total_questions),
+        total_time_seconds: form.total_time_seconds ? Number(form.total_time_seconds) : null,
+        time_per_question: form.time_per_question ? Number(form.time_per_question) : null,
+        marks_per_correct: Number(form.marks_per_correct),
+        total_marks: Number(form.total_marks),
+        is_active: form.is_active,
+      }),
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (res.ok) { toast.success('Assessment updated'); onUpdated(data.assessment) }
+    else toast.error(data.error)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header"><h3>Edit Assessment</h3><button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button></div>
+        <form onSubmit={submit}>
+          <div className="modal-body">
+            <div className="form-group"><label className="form-label">Assessment name *</label><input className="form-input" value={form.name} onChange={f('name')} required autoFocus /></div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Total questions *</label><input type="number" className="form-input" value={form.total_questions} onChange={f('total_questions')} required min={1} /><span className="form-hint">Drawn from question bank</span></div>
+              <div className="form-group"><label className="form-label">Marks per correct *</label><input type="number" className="form-input" value={form.marks_per_correct} onChange={f('marks_per_correct')} required min={0.5} step={0.5} /></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Total marks *</label><input type="number" className="form-input" value={form.total_marks} onChange={f('total_marks')} required /></div>
+              <div className="form-group"><label className="form-label">Total time (seconds)</label><input type="number" className="form-input" value={form.total_time_seconds} onChange={f('total_time_seconds')} placeholder="No limit" min={60} /></div>
+            </div>
+            <div className="form-group"><label className="form-label">Time per question (seconds)</label><input type="number" className="form-input" value={form.time_per_question} onChange={f('time_per_question')} placeholder="No per-question timer" min={10} /><span className="form-hint">If set, question auto-advances when timer ends</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="checkbox" id="editIsActive" checked={form.is_active} onChange={e => setForm(x => ({ ...x, is_active: e.target.checked }))} />
+              <label htmlFor="editIsActive" style={{ fontSize: '0.875rem', color: 'var(--slate-700)', cursor: 'pointer' }}>Active</label>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving…' : 'Save Changes'}</button>
+          </div>
+        </form>
       </div>
     </div>
   )
