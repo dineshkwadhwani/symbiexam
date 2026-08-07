@@ -15,6 +15,10 @@ export default function UsersPage() {
   const [selected, setSelected] = useState<any | null>(null)
   const [detailPaper, setDetailPaper] = useState<any | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
+  const [resending, setResending] = useState(false)
+  const [pwdModal, setPwdModal] = useState<{ name: string; password: string } | null>(null)
+  const [showingPwd, setShowingPwd] = useState(false)
 
   useEffect(() => {
     async function init() {
@@ -40,6 +44,43 @@ export default function UsersPage() {
     if (data.error) toast.error(data.error)
     else setDetailPaper(data)
     setDetailLoading(false)
+  }
+
+  async function resendWelcome() {
+    if (checkedIds.size === 0) return
+    setResending(true)
+    const res = await fetch('/api/students/bulk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resend_welcome', student_ids: [...checkedIds] }),
+    })
+    const data = await res.json()
+    setResending(false)
+    if (res.ok) {
+      toast.success(`Welcome mail queued for ${data.count} student${data.count !== 1 ? 's' : ''}`)
+      setCheckedIds(new Set())
+    } else {
+      toast.error(data.error || 'Failed to resend')
+    }
+  }
+
+  async function showPassword() {
+    const [id] = [...checkedIds]
+    setShowingPwd(true)
+    const res = await fetch(`/api/students/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reset_password: true }),
+    })
+    const data = await res.json()
+    setShowingPwd(false)
+    if (res.ok) {
+      const student = students.find(s => s.id === id)
+      setPwdModal({ name: student?.full_name ?? 'Student', password: data.new_password })
+      setCheckedIds(new Set())
+    } else {
+      toast.error(data.error || 'Failed')
+    }
   }
 
   if (!profile) return <div className="loading-page"><span className="spinner" /></div>
@@ -241,6 +282,21 @@ export default function UsersPage() {
   }
 
   // ── Student list view ────────────────────────────────────────
+  const allFilteredIds = filtered.map((s: any) => s.id)
+  const allChecked = allFilteredIds.length > 0 && allFilteredIds.every((id: string) => checkedIds.has(id))
+
+  function toggleAll() {
+    if (allChecked) {
+      setCheckedIds(ids => { const next = new Set(ids); allFilteredIds.forEach((id: string) => next.delete(id)); return next })
+    } else {
+      setCheckedIds(ids => new Set([...ids, ...allFilteredIds]))
+    }
+  }
+
+  function toggleOne(id: string) {
+    setCheckedIds(ids => { const next = new Set(ids); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+
   return (
     <AppShell profile={profile}>
       <div className="page-header-row">
@@ -248,6 +304,26 @@ export default function UsersPage() {
           <h1>Students</h1>
           <p>All students across your cohorts</p>
         </div>
+        {checkedIds.size > 0 && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={resendWelcome}
+              disabled={resending}
+            >
+              {resending ? 'Sending…' : `Resend Welcome (${checkedIds.size})`}
+            </button>
+            {checkedIds.size === 1 && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={showPassword}
+                disabled={showingPwd}
+              >
+                {showingPwd ? 'Loading…' : 'Show PWD'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div style={{ height: 20 }} />
 
@@ -278,6 +354,9 @@ export default function UsersPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th style={{ width: 36 }}>
+                    <input type="checkbox" checked={allChecked} onChange={toggleAll} style={{ cursor: 'pointer' }} />
+                  </th>
                   <th>Name</th>
                   <th>PRN ID</th>
                   <th>Email</th>
@@ -292,6 +371,9 @@ export default function UsersPage() {
                   const isNew = s.total_assessments === 0 && !s.last_activity
                   return (
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(s)}>
+                      <td onClick={e => { e.stopPropagation(); toggleOne(s.id) }}>
+                        <input type="checkbox" checked={checkedIds.has(s.id)} onChange={() => toggleOne(s.id)} style={{ cursor: 'pointer' }} />
+                      </td>
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--blue-600)' }}>{s.full_name}</div>
                       </td>
@@ -319,5 +401,28 @@ export default function UsersPage() {
         </div>
       )}
     </AppShell>
+
+    {pwdModal && (
+      <div className="modal-overlay" onClick={() => setPwdModal(null)}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+          <div className="modal-header">
+            <h3>Password for {pwdModal.name}</h3>
+            <button className="btn btn-ghost btn-icon" onClick={() => setPwdModal(null)}>✕</button>
+          </div>
+          <div className="modal-body">
+            <p style={{ color: 'var(--slate-500)', fontSize: '0.85rem', marginBottom: 16 }}>
+              This is a newly reset password. The student will be required to change it on next login.
+            </p>
+            <div style={{ background: 'var(--slate-50)', border: '1px solid var(--slate-200)', borderRadius: 8, padding: '14px 18px', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'monospace', fontSize: '1.4rem', fontWeight: 800, letterSpacing: 3, color: 'var(--slate-900)' }}>{pwdModal.password}</div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-primary" onClick={() => { navigator.clipboard.writeText(pwdModal.password); toast.success('Copied!') }}>Copy</button>
+            <button className="btn btn-secondary" onClick={() => setPwdModal(null)}>Close</button>
+          </div>
+        </div>
+      </div>
+    )}
   )
 }

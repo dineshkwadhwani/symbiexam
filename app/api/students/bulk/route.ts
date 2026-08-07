@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { sendWelcomeEmail, sendCohortAddedEmail } from '@/lib/email'
 import { generatePassword } from '@/lib/auth'
 
@@ -10,6 +10,10 @@ interface StudentRow {
   prn_id?: string
 }
 
+type PendingEmail =
+  | { type: 'welcome'; email: string; name: string; password: string }
+  | { type: 'cohort'; email: string; name: string }
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -17,6 +21,7 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient()
 
     const results: { email: string; status: 'added' | 'exists' | 'error'; error?: string }[] = []
+    const pendingEmails: PendingEmail[] = []
 
     for (const s of students) {
       try {
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
             })
           }
           await admin.from('cohort_students').insert({ cohort_id, student_id: userId }).select()
-          try { await sendCohortAddedEmail(s.email, profile?.full_name ?? s.full_name, cohort_name) } catch {}
+          pendingEmails.push({ type: 'cohort', email: s.email, name: profile?.full_name ?? s.full_name })
           results.push({ email: s.email, status: 'exists' })
         } else {
           const pw = generatePassword()
@@ -57,11 +62,7 @@ export async function POST(req: NextRequest) {
             must_change_password: true,
           })
           await admin.from('cohort_students').insert({ cohort_id, student_id: userId })
-
-          try {
-            await sendWelcomeEmail(s.email, s.full_name, pw, cohort_name)
-          } catch {}
-
+          pendingEmails.push({ type: 'welcome', email: s.email, name: s.full_name, password: pw })
           results.push({ email: s.email, status: 'added' })
         }
       } catch (e: any) {
@@ -69,7 +70,62 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    void (async () => {
+      for (const e of pendingEmails) {
+        try {
+          if (e.type === 'welcome') await sendWelcomeEmail(e.email, e.name, e.password, cohort_name)
+          else await sendCohortAddedEmail(e.email, e.name, cohort_name)
+        } catch {}
+      }
+    })()
+
     return NextResponse.json({ results })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
+    const { action, student_ids }: { action: string; student_ids: string[] } = await req.json()
+    if (action !== 'resend_welcome' || !Array.isArray(student_ids) || student_ids.length === 0) {
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    }
+
+    const admin = createAdminClient()
+
+    // Collect data for all students before firing emails
+    const pendingEmails: { email: string; name: string; password: string; cohortName: string }[] = []
+
+    for (const id of student_ids) {
+      const { data: profile } = await admin.from('profiles').select('email, full_name').eq('id', id).single()
+      if (!profile) continue
+
+      const newPw = generatePassword()
+      await admin.auth.admin.updateUserById(id, { password: newPw })
+      await admin.from('profiles').update({ must_change_password: true }).eq('id', id)
+
+      const { data: cohortRows } = await admin
+        .from('cohort_students')
+        .select('cohort:cohorts(name)')
+        .eq('student_id', id)
+        .limit(1)
+      const cohortName = (cohortRows?.[0]?.cohort as any)?.name ?? 'your cohort'
+
+      pendingEmails.push({ email: profile.email, name: profile.full_name, password: newPw, cohortName })
+    }
+
+    void (async () => {
+      for (const e of pendingEmails) {
+        try { await sendWelcomeEmail(e.email, e.name, e.password, e.cohortName) } catch {}
+      }
+    })()
+
+    return NextResponse.json({ ok: true, count: pendingEmails.length })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

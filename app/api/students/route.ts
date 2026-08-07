@@ -23,9 +23,7 @@ export async function POST(req: NextRequest) {
       if (csError && !csError.message.includes('duplicate')) {
         return NextResponse.json({ error: csError.message }, { status: 400 })
       }
-      try {
-        await sendCohortAddedEmail(email, profile?.full_name ?? full_name, cohort_name || 'your cohort')
-      } catch (e) { console.error('Cohort email failed:', e) }
+      void sendCohortAddedEmail(email, profile?.full_name ?? full_name, cohort_name || 'your cohort').catch(e => console.error('Cohort email failed:', e))
       return NextResponse.json({ ok: true, userId }, { status: 200 })
     }
 
@@ -48,9 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: csError.message }, { status: 400 })
     }
 
-    try {
-      await sendWelcomeEmail(email, full_name, plainPassword, cohort_name || 'your cohort')
-    } catch (e) { console.error('Email failed:', e) }
+    void sendWelcomeEmail(email, full_name, plainPassword, cohort_name || 'your cohort').catch(e => console.error('Email failed:', e))
 
     return NextResponse.json({ ok: true, userId }, { status: 201 })
   } catch (e: any) {
