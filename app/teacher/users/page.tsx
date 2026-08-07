@@ -19,6 +19,8 @@ export default function UsersPage() {
   const [resending, setResending] = useState(false)
   const [pwdModal, setPwdModal] = useState<{ name: string; password: string } | null>(null)
   const [showingPwd, setShowingPwd] = useState(false)
+  const [sortBy, setSortBy] = useState<'name' | 'created_at'>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     async function init() {
@@ -89,7 +91,11 @@ export default function UsersPage() {
     s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     s.email?.toLowerCase().includes(search.toLowerCase()) ||
     s.prn_id?.toLowerCase().includes(search.toLowerCase())
-  )
+  ).sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    if (sortBy === 'name') return dir * (a.full_name ?? '').localeCompare(b.full_name ?? '')
+    return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  })
 
   // ── Detail view ─────────────────────────────────────────────
   if (detailPaper) {
@@ -327,8 +333,8 @@ export default function UsersPage() {
       </div>
       <div style={{ height: 20 }} />
 
-      {/* Search */}
-      <div style={{ marginBottom: 16 }}>
+      {/* Search + Sort */}
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
         <input
           className="form-input"
           style={{ maxWidth: 340 }}
@@ -336,6 +342,28 @@ export default function UsersPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--slate-500)', whiteSpace: 'nowrap' }}>Sort by</span>
+          <select
+            className="form-input"
+            style={{ width: 'auto', paddingRight: 32 }}
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as 'name' | 'created_at')}
+          >
+            <option value="name">Name</option>
+            <option value="created_at">Date Added</option>
+          </select>
+          <button
+            className="btn btn-ghost btn-sm"
+            title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+            onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+          >
+            {sortDir === 'asc'
+              ? <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9M3 12h5m10 4V6m0 0l-3 3m3-3l3 3" /></svg>
+              : <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9M3 12h5m10-4v14m0 0l-3-3m3 3l3-3" /></svg>
+            }
+          </button>
+        </div>
       </div>
 
       {loading ? (
