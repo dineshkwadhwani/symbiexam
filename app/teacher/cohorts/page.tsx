@@ -17,6 +17,7 @@ export default function CohortsPage() {
   const [members, setMembers] = useState<CohortStudent[]>([])
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showAddStudent, setShowAddStudent] = useState(false)
+  const [editingCohort, setEditingCohort] = useState<Cohort | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -79,6 +80,22 @@ export default function CohortsPage() {
     }
   }
 
+  async function editCohort(c: Cohort, name: string, description: string) {
+    const res = await fetch(`/api/cohorts/${c.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setCohorts(list => list.map(x => x.id === c.id ? data.cohort : x))
+      setEditingCohort(null)
+      toast.success('Cohort updated')
+    } else {
+      toast.error(data.error || 'Failed to update cohort')
+    }
+  }
+
   if (!profile) return <div className="loading-page"><span className="spinner" /> Loading…</div>
 
   return (
@@ -114,14 +131,24 @@ export default function CohortsPage() {
                       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--slate-900)', marginBottom: 4 }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: '0.8rem', color: 'var(--slate-500)' }}>{c.description}</div>}
                     </div>
+                    <div style={{ display: 'flex', gap: 4, marginLeft: 12 }}>
                     <button
                       className="btn btn-ghost btn-sm"
-                      style={{ color: 'var(--red-600)', whiteSpace: 'nowrap', marginLeft: 12 }}
+                      style={{ color: 'var(--slate-500)', whiteSpace: 'nowrap' }}
+                      onClick={() => setEditingCohort(c)}
+                      title="Edit cohort"
+                    >
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--red-600)', whiteSpace: 'nowrap' }}
                       onClick={() => deleteCohort(c)}
                       title="Delete cohort"
                     >
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }} onClick={() => openCohort(c)}>
                     <div>
@@ -153,6 +180,13 @@ export default function CohortsPage() {
         <CreateCohortModal
           onClose={() => setShowCreateModal(false)}
           onCreated={(c) => { setCohorts(cs => [c, ...cs]); setShowCreateModal(false) }}
+        />
+      )}
+      {editingCohort && (
+        <EditCohortModal
+          cohort={editingCohort}
+          onClose={() => setEditingCohort(null)}
+          onSaved={(name, description) => editCohort(editingCohort, name, description)}
         />
       )}
     </AppShell>
@@ -251,6 +285,37 @@ function CohortDetail({ cohort, members, onBack, onMembersChange, onRemove, onRe
         />
       )}
     </>
+  )
+}
+
+function EditCohortModal({ cohort, onClose, onSaved }: { cohort: Cohort; onClose: () => void; onSaved: (name: string, description: string) => void }) {
+  const [name, setName] = useState(cohort.name)
+  const [desc, setDesc] = useState(cohort.description ?? '')
+  const [loading, setLoading] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    await onSaved(name, desc)
+    setLoading(false)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header"><h3>Edit Cohort</h3><button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button></div>
+        <form onSubmit={submit}>
+          <div className="modal-body">
+            <div className="form-group"><label className="form-label">Cohort name *</label><input className="form-input" value={name} onChange={e => setName(e.target.value)} required autoFocus /></div>
+            <div className="form-group"><label className="form-label">Description</label><input className="form-input" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Optional description" /></div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving…' : 'Save Changes'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
