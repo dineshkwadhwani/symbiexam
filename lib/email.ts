@@ -48,6 +48,7 @@ export async function sendWelcomeEmail(
       </div>
     `,
   })
+  await emailDelay()
 }
 
 export async function sendPasswordResetEmail(to: string, name: string, newPassword: string) {
