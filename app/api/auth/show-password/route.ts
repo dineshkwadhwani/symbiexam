@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
   }
 
   const newPw = generatePassword()
-  await admin.auth.admin.updateUserById(profile.id, { password: newPw })
+  const { error: authErr } = await admin.auth.admin.updateUserById(profile.id, { password: newPw })
+  if (authErr) return NextResponse.json({ error: authErr.message }, { status: 500 })
   await admin.from('profiles').update({ must_change_password: true }).eq('id', profile.id)
 
   return NextResponse.json({ password: newPw, name: profile.full_name })

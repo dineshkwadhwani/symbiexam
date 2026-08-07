@@ -68,8 +68,15 @@ export async function POST(req: NextRequest) {
       if (profile) targetStudents = [profile as any]
     }
 
-    // Generate paper for each student
-    for (const student of targetStudents) {
+    // Generate paper for each student who doesn't already have one for this assessment
+    const { data: existingPapers } = await admin
+      .from('student_papers')
+      .select('student_id')
+      .eq('assessment_id', assessment_id)
+    const alreadyAssigned = new Set((existingPapers ?? []).map((p: any) => p.student_id))
+    const newStudents = targetStudents.filter(s => !alreadyAssigned.has(s.id))
+
+    for (const student of newStudents) {
       const paperQuestions = generatePaper(questions as Question[], assessment.total_questions)
 
       const { data: paper } = await admin
@@ -94,7 +101,7 @@ export async function POST(req: NextRequest) {
     }
 
     void (async () => {
-      for (const student of targetStudents) {
+      for (const student of newStudents) {
         try {
           await sendAssessmentAssignedEmail(student.email, student.full_name, assessment.name)
         } catch (e) {
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
       }
     })()
 
-    return NextResponse.json({ assignment, students_assigned: targetStudents.length }, { status: 201 })
+    return NextResponse.json({ assignment, students_assigned: newStudents.length }, { status: 201 })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
