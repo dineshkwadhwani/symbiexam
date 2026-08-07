@@ -10,6 +10,8 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [showPasswordMode, setShowPasswordMode] = useState(false)
+  const [togglingMode, setTogglingMode] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -20,6 +22,7 @@ export default function ProfilePage() {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(p)
       setPhone(p?.phone ?? '')
+      setShowPasswordMode(p?.show_password_mode ?? false)
     }
     load()
   }, [])
@@ -108,7 +111,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Info form */}
-        <div className="card">
+        <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-header"><h3 style={{ margin: 0 }}>Account Details</h3></div>
           <form onSubmit={saveProfile}>
             <div className="card-body">
@@ -138,6 +141,51 @@ export default function ProfilePage() {
             </div>
           </form>
         </div>
+
+        {/* Show Password Mode — teacher only */}
+        {profile.role === 'teacher' && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="card-header"><h3 style={{ margin: 0 }}>Student Login Settings</h3></div>
+            <div className="card-body">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--slate-800)', marginBottom: 4 }}>Show Password Mode</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--slate-500)' }}>
+                    When enabled, the "Forgot password?" link on the login page is replaced with "Show Password". Students can enter their email and PRN to retrieve their password directly.
+                  </div>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={showPasswordMode}
+                  disabled={togglingMode}
+                  onClick={async () => {
+                    setTogglingMode(true)
+                    const next = !showPasswordMode
+                    const res = await fetch('/api/settings', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ show_password_mode: next }),
+                    })
+                    setTogglingMode(false)
+                    if (res.ok) { setShowPasswordMode(next); toast.success(next ? 'Show Password mode enabled' : 'Forgot Password mode restored') }
+                    else toast.error('Failed to update setting')
+                  }}
+                  style={{
+                    flexShrink: 0, width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: showPasswordMode ? 'var(--blue-600)' : 'var(--slate-300)',
+                    position: 'relative', transition: 'background 0.2s', padding: 0,
+                  }}
+                >
+                  <span style={{
+                    display: 'block', width: 18, height: 18, borderRadius: '50%', background: 'white',
+                    position: 'absolute', top: 3, left: showPasswordMode ? 23 : 3, transition: 'left 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   )

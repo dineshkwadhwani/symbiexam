@@ -9,6 +9,7 @@ export interface Profile {
   role: Role
   avatar_url?: string
   must_change_password: boolean
+  show_password_mode?: boolean
   created_at: string
 }
 

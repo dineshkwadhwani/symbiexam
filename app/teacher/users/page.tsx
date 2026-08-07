@@ -401,7 +401,7 @@ export default function UsersPage() {
                   return (
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(s)}>
                       <td onClick={e => { e.stopPropagation(); toggleOne(s.id) }}>
-                        <input type="checkbox" checked={checkedIds.has(s.id)} onChange={() => toggleOne(s.id)} style={{ cursor: 'pointer' }} />
+                        <input type="checkbox" checked={checkedIds.has(s.id)} onChange={() => toggleOne(s.id)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
                       </td>
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--blue-600)' }}>{s.full_name}</div>
