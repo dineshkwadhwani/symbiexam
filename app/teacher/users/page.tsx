@@ -306,6 +306,7 @@ export default function UsersPage() {
   return (
     <>
     <AppShell profile={profile}>
+      <div className="page-header-row">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>Students</h1>
           <p>All students across your cohorts</p>
