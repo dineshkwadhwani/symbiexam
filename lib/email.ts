@@ -5,6 +5,7 @@ const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'assessments@yourdomain.com'
 const FROM_NAME = process.env.RESEND_FROM_NAME || 'Exam Studio'
 const FROM = FROM_NAME ? `${FROM_NAME} <${FROM_EMAIL}>` : FROM_EMAIL
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const emailDelay = () => new Promise(res => setTimeout(res, Number(process.env.EMAIL_SEND_DELAY_MS ?? 1000)))
 
 export async function sendWelcomeEmail(
   to: string,
@@ -79,6 +80,7 @@ export async function sendPasswordResetEmail(to: string, name: string, newPasswo
       </div>
     `,
   })
+  await emailDelay()
 }
 
 export async function sendCohortAddedEmail(to: string, name: string, cohortName: string) {
@@ -111,6 +113,7 @@ export async function sendCohortAddedEmail(to: string, name: string, cohortName:
       </div>
     `,
   })
+  await emailDelay()
 }
 
 export async function sendAssessmentAssignedEmail(
@@ -148,4 +151,5 @@ export async function sendAssessmentAssignedEmail(
       </div>
     `,
   })
+  await emailDelay()
 }

@@ -93,7 +93,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Send emails after all papers are generated, with 1s delay between each
     void (async () => {
       for (const student of targetStudents) {
         try {
@@ -101,7 +100,6 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           console.error('Assignment email failed for', student.email, e)
         }
-        await new Promise(res => setTimeout(res, Number(process.env.EMAIL_SEND_DELAY_MS ?? 1000)))
       }
     })()
 
