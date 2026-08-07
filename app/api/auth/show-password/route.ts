@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const newPw = generatePassword()
   await admin.auth.admin.updateUserById(profile.id, { password: newPw })
-  await admin.from('profiles').update({ must_change_password: false }).eq('id', profile.id)
+  await admin.from('profiles').update({ must_change_password: true }).eq('id', profile.id)
 
   return NextResponse.json({ password: newPw, name: profile.full_name })
 }
