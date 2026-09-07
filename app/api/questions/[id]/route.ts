@@ -33,3 +33,26 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: questionId } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
+  const body = await req.json()
+  const { data: question } = await supabase.from('questions').select('assessment_id').eq('id', questionId).single()
+  if (!question) return NextResponse.json({ error: 'Question not found' }, { status: 404 })
+
+  const { data: assessment } = await supabase
+    .from('assessments')
+    .select('id')
+    .eq('id', question.assessment_id)
+    .eq('teacher_id', user.id)
+    .single()
+  if (!assessment) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { data, error } = await supabase.from('questions').update(body).eq('id', questionId).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  return NextResponse.json({ question: data })
+}

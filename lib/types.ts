@@ -1,4 +1,5 @@
 export type Role = 'teacher' | 'student'
+export type AssessmentType = 'mcq' | 'subjective' | 'subjective_online'
 
 export interface Profile {
   id: string
@@ -33,6 +34,7 @@ export interface CohortStudent {
 export interface Assessment {
   id: string
   name: string
+  assessment_type: AssessmentType
   total_questions: number
   total_time_seconds?: number
   time_per_question?: number
@@ -53,11 +55,14 @@ export interface Question {
   bloom_level?: number
   bloom_label?: string
   question_text: string
-  option_a: string
-  option_b: string
-  option_c: string
-  option_d: string
-  correct_answer: 'A' | 'B' | 'C' | 'D'
+  image_url?: string
+  model_answer?: string
+  max_marks?: number
+  option_a?: string
+  option_b?: string
+  option_c?: string
+  option_d?: string
+  correct_answer?: 'A' | 'B' | 'C' | 'D'
   explanation?: string
   created_at: string
 }
@@ -95,7 +100,11 @@ export interface PaperQuestion {
   question_id: string
   question_order: number
   selected_answer?: 'A' | 'B' | 'C' | 'D'
+  answer_text?: string
   is_correct?: boolean
+  marks_awarded?: number
+  evaluation_feedback?: string
+  evaluation_status?: 'not_started' | 'queued' | 'processing' | 'completed' | 'failed'
   question?: Question
 }
 

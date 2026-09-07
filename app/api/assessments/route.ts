@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       .from('assessments')
       .insert({
         name: body.name,
+        assessment_type: body.assessment_type ?? 'mcq',
         total_questions: body.total_questions,
         total_time_seconds: body.total_time_seconds || null,
         time_per_question: body.time_per_question || null,

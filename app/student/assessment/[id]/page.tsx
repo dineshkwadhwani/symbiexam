@@ -158,6 +158,15 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
     })
   }
 
+  async function saveSubjectiveAnswer(pqId: string, answer: string) {
+    setAnswers(prev => ({ ...prev, [pqId]: answer }))
+    await fetch(`/api/papers/${paperId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'answer', paper_question_id: pqId, answer_text: answer }),
+    })
+  }
+
   function nextQ() {
     if (current < questions.length - 1) {
       setCurrent(c => c + 1)
@@ -294,21 +303,20 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
           userSelect: 'none',
           WebkitUserSelect: 'none',
         }}>
-          <div className="quiz-question-text">{q.question_text}</div>
+          {a?.assessment_type === 'subjective' && q.image_url && <img src={q.image_url} alt="Question illustration" style={{ display: 'block', maxWidth: '100%', maxHeight: 240, objectFit: 'contain', marginBottom: 16 }} />}
+          <div className="quiz-question-text" dangerouslySetInnerHTML={a?.assessment_type === 'subjective' ? { __html: q.question_text } : undefined}>{a?.assessment_type === 'subjective' ? undefined : q.question_text}</div>
 
-          <div className="quiz-options">
-            {['A', 'B', 'C', 'D'].map(opt => (
-              <button
-                key={opt}
-                className={`quiz-option ${answers[pq.id] === opt ? 'selected' : ''}`}
-                onClick={() => selectAnswer(pq.id, opt)}
-                disabled={submitting}
-              >
-                <span className="quiz-option-key">{opt}</span>
-                <span className="quiz-option-text">{q[`option_${opt.toLowerCase()}`]}</span>
-              </button>
-            ))}
-          </div>
+          {a?.assessment_type === 'subjective' ? (
+            <textarea className="form-input" rows={10} value={answers[pq.id] ?? ''} onChange={e => saveSubjectiveAnswer(pq.id, e.target.value)} disabled={submitting} placeholder="Write your answer here..." style={{ marginTop: 18, resize: 'vertical' }} />
+          ) : (
+            <div className="quiz-options">
+              {['A', 'B', 'C', 'D'].map(opt => (
+                <button key={opt} className={`quiz-option ${answers[pq.id] === opt ? 'selected' : ''}`} onClick={() => selectAnswer(pq.id, opt)} disabled={submitting}>
+                  <span className="quiz-option-key">{opt}</span><span className="quiz-option-text">{q[`option_${opt.toLowerCase()}`]}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Question navigator dots */}

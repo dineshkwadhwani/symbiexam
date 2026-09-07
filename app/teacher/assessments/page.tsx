@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import type { Profile, Assessment, Cohort } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import * as XLSX from 'xlsx'
 
 export default function AssessmentsPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -160,11 +161,11 @@ export default function AssessmentsPage() {
         />
       )}
       {uploadModal && (
-        <UploadQuestionsModal
-          assessment={uploadModal}
-          onClose={() => setUploadModal(null)}
-          onUploaded={() => { setUploadModal(null); window.location.reload() }}
-        />
+        uploadModal.assessment_type === 'subjective' ? (
+          <SubjectiveQuestionsModal assessment={uploadModal} onClose={() => setUploadModal(null)} onUploaded={() => { setUploadModal(null); window.location.reload() }} />
+        ) : (
+          <UploadQuestionsModal assessment={uploadModal} onClose={() => setUploadModal(null)} onUploaded={() => { setUploadModal(null); window.location.reload() }} />
+        )
       )}
       {tryModal && (
         <TryAssessmentModal assessment={tryModal} onClose={() => setTryModal(null)} />
@@ -188,7 +189,7 @@ export default function AssessmentsPage() {
 }
 
 function CreateAssessmentModal({ onClose, onCreated }: any) {
-  const [form, setForm] = useState({ name: '', total_questions: 20, total_time_seconds: '', time_per_question: '', marks_per_correct: 1, total_marks: 20, is_active: false })
+  const [form, setForm] = useState({ name: '', assessment_type: 'mcq', total_questions: 20, total_time_seconds: '', time_per_question: '', marks_per_correct: 1, total_marks: 20, is_active: false })
   const [loading, setLoading] = useState(false)
 
   const f = (k: string) => (e: any) => setForm(x => ({ ...x, [k]: e.target.value }))
@@ -210,6 +211,7 @@ function CreateAssessmentModal({ onClose, onCreated }: any) {
         <form onSubmit={submit}>
           <div className="modal-body">
             <div className="form-group"><label className="form-label">Assessment name *</label><input className="form-input" value={form.name} onChange={f('name')} required autoFocus placeholder="e.g. CO1-CO2 Mid Term" /></div>
+            <div className="form-group"><label className="form-label">Assessment type *</label><select className="form-select" value={form.assessment_type} onChange={f('assessment_type')}><option value="mcq">MCQ</option><option value="subjective">Subjective</option><option value="subjective_online" disabled>Subjective Online (coming later)</option></select><span className="form-hint">Subjective and Subjective Online use separate workflows.</span></div>
             <div className="form-row">
               <div className="form-group"><label className="form-label">Total questions *</label><input type="number" className="form-input" value={form.total_questions} onChange={f('total_questions')} required min={1} /><span className="form-hint">Drawn from question bank</span></div>
               <div className="form-group"><label className="form-label">Marks per correct answer *</label><input type="number" className="form-input" value={form.marks_per_correct} onChange={f('marks_per_correct')} required min={0.5} step={0.5} /></div>
@@ -232,6 +234,72 @@ function CreateAssessmentModal({ onClose, onCreated }: any) {
       </div>
     </div>
   )
+}
+
+function SubjectiveQuestionsModal({ assessment, onClose, onUploaded }: any) {
+  const [questions, setQuestions] = useState<any[]>([])
+  const [draft, setDraft] = useState({ question: '', model_answer: '', max_marks: 5, co: '', bloom_level: '', bloom_label: '', image_url: '' })
+  const [current, setCurrent] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  function addDraft() {
+    if (!draft.question.replace(/<[^>]+>/g, '').trim() || !draft.model_answer.trim() || Number(draft.max_marks) <= 0) {
+      toast.error('Question, model answer, and maximum marks are required')
+      return
+    }
+    setQuestions(list => [...list, { ...draft, max_marks: Number(draft.max_marks) }])
+    setDraft({ question: '', model_answer: '', max_marks: 5, co: '', bloom_level: '', bloom_label: '', image_url: '' })
+    setCurrent(questions.length + 1)
+  }
+
+  function downloadTemplate() {
+    const sheet = XLSX.utils.json_to_sheet([{ question: '', model_answer: '', max_marks: 5, co: '', bloom_level: '', bloom_label: '', image_url: '' }])
+    const book = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(book, sheet, 'Subjective Questions')
+    XLSX.writeFile(book, 'subjective-question-template.xlsx')
+  }
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = event => {
+      try {
+        const workbook = XLSX.read(event.target?.result, { type: 'array' })
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' })
+        setQuestions(rows as any[])
+        toast.success(`${rows.length} questions loaded`)
+      } catch { toast.error('Invalid XLSX file') }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  async function upload() {
+    if (!questions.length) return
+    setLoading(true)
+    const res = await fetch('/api/questions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assessment_id: assessment.id, questions }) })
+    const data = await res.json()
+    setLoading(false)
+    if (res.ok) { toast.success(`${data.inserted} subjective questions saved`); onUploaded() } else toast.error(data.error)
+  }
+
+  return <div className="modal-overlay" onClick={onClose}>
+    <div className="modal" style={{ maxWidth: 760 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-header"><h3>Subjective Questions — {assessment.name}</h3><button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button></div>
+      <div className="modal-body">
+        <div className="alert alert-info">Add one question at a time, or upload the XLSX template. Images can be added later during review using an image URL.</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}><button className="btn btn-secondary btn-sm" onClick={downloadTemplate}>Download XLSX Template</button><button className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>Upload XLSX</button><input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFile} /></div>
+        <div className="form-group"><label className="form-label">Question {questions.length + 1} *</label><div className="form-hint">Rich text is supported. Paste formatted text or links.</div><div className="form-input" contentEditable suppressContentEditableWarning onInput={e => setDraft(x => ({ ...x, question: e.currentTarget.innerHTML }))} style={{ minHeight: 100, overflowY: 'auto' }} /> </div>
+        <div className="form-group"><label className="form-label">Model answer *</label><textarea className="form-input" rows={4} value={draft.model_answer} onChange={e => setDraft(x => ({ ...x, model_answer: e.target.value }))} /></div>
+        <div className="form-row"><div className="form-group"><label className="form-label">Maximum marks *</label><input type="number" className="form-input" min={0.5} step={0.5} value={draft.max_marks} onChange={e => setDraft(x => ({ ...x, max_marks: Number(e.target.value) }))} /></div><div className="form-group"><label className="form-label">CO number</label><input className="form-input" value={draft.co} onChange={e => setDraft(x => ({ ...x, co: e.target.value }))} /></div><div className="form-group"><label className="form-label">Bloom level</label><input className="form-input" value={draft.bloom_level} onChange={e => setDraft(x => ({ ...x, bloom_level: e.target.value }))} /></div></div>
+        <div className="form-row"><div className="form-group"><label className="form-label">Bloom label</label><input className="form-input" value={draft.bloom_label} onChange={e => setDraft(x => ({ ...x, bloom_label: e.target.value }))} /></div><div className="form-group"><label className="form-label">Image URL</label><input className="form-input" value={draft.image_url} onChange={e => setDraft(x => ({ ...x, image_url: e.target.value }))} placeholder="Optional public image URL" /></div></div>
+        <button className="btn btn-secondary" onClick={addDraft}>Add Question to Review</button>
+        {questions.length > 0 && <div style={{ marginTop: 20 }}><span className="badge badge-green">{questions.length} questions ready</span><ol style={{ marginTop: 10, paddingLeft: 20 }}>{questions.map((q, i) => <li key={i} style={{ marginBottom: 6 }}>{String(q.question).replace(/<[^>]+>/g, '').slice(0, 100)} <button className="btn btn-ghost btn-sm" onClick={() => setQuestions(list => list.filter((_, index) => index !== i))}>Remove</button></li>)}</ol></div>}
+      </div>
+      <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={!questions.length || loading} onClick={upload}>{loading ? 'Saving…' : 'Save Questions'}</button></div>
+    </div>
+  </div>
 }
 
 function UploadQuestionsModal({ assessment, onClose, onUploaded }: any) {
@@ -647,6 +715,9 @@ function ReviewQuestionsModal({ assessment, onClose, onQuestionDeleted }: any) {
           ) : (
             <div>
               {questions.map((q, idx) => {
+                if (assessment.assessment_type === 'subjective') {
+                  return <SubjectiveReviewRow key={q.id} question={q} index={idx} onDeleted={() => deleteQuestion(q.id)} />
+                }
                 const correctOptionKey = q.correct_answer?.toUpperCase() || 'A'
                 const optionMap: Record<string, string> = {
                   'A': q.option_a,
@@ -745,4 +816,30 @@ function ReviewQuestionsModal({ assessment, onClose, onQuestionDeleted }: any) {
       </div>
     </div>
   )
+}
+
+function SubjectiveReviewRow({ question, index, onDeleted }: any) {
+  const [form, setForm] = useState({ question_text: question.question_text, model_answer: question.model_answer ?? '', max_marks: question.max_marks ?? 0, co: question.co ?? '', bloom_level: question.bloom_level ?? '', bloom_label: question.bloom_label ?? '', image_url: question.image_url ?? '' })
+  const [saving, setSaving] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  async function save() {
+    setSaving(true)
+    const res = await fetch(`/api/questions/${question.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, max_marks: Number(form.max_marks), bloom_level: form.bloom_level ? Number(form.bloom_level) : null }) })
+    setSaving(false)
+    if (res.ok) toast.success('Question updated'); else toast.error((await res.json()).error)
+  }
+  async function uploadImage(file: File) {
+    const body = new FormData(); body.append('image', file)
+    const res = await fetch(`/api/questions/${question.id}/image`, { method: 'POST', body })
+    const data = await res.json()
+    if (res.ok) setForm(x => ({ ...x, image_url: data.question.image_url })); else toast.error(data.error)
+  }
+  return <div style={{ marginBottom: 28, paddingBottom: 28, borderBottom: '1px solid var(--slate-200)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><strong>Q{index + 1}</strong><button className="btn btn-ghost btn-sm" style={{ color: 'var(--red-600)' }} onClick={onDeleted}>Delete</button></div>
+    {form.image_url && <img src={form.image_url} alt="Question illustration" style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', display: 'block', marginBottom: 10 }} />}
+    <div className="form-group"><label className="form-label">Question rich text</label><div className="form-input" contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: form.question_text }} onInput={e => setForm(x => ({ ...x, question_text: e.currentTarget.innerHTML }))} /></div>
+    <div className="form-group"><label className="form-label">Model answer</label><textarea className="form-input" rows={3} value={form.model_answer} onChange={e => setForm(x => ({ ...x, model_answer: e.target.value }))} /></div>
+    <div className="form-row"><input className="form-input" placeholder="Max marks" type="number" value={form.max_marks} onChange={e => setForm(x => ({ ...x, max_marks: Number(e.target.value) }))} /><input className="form-input" placeholder="CO" value={form.co} onChange={e => setForm(x => ({ ...x, co: e.target.value }))} /><input className="form-input" placeholder="Bloom level" value={form.bloom_level} onChange={e => setForm(x => ({ ...x, bloom_level: e.target.value }))} /></div>
+    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>Attach image</button><input ref={fileRef} hidden type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; if (file) void uploadImage(file) }} /><button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button></div>
+  </div>
 }

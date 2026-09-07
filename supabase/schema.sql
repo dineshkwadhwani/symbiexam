@@ -42,6 +42,7 @@ create table public.cohort_students (
 create table public.assessments (
   id                  uuid primary key default uuid_generate_v4(),
   name                text not null,
+  assessment_type     text not null default 'mcq' check (assessment_type in ('mcq','subjective','subjective_online')),
   total_questions     int not null,
   total_time_seconds  int,            -- null = no overall timer
   time_per_question   int,            -- null = no per-question timer
@@ -62,11 +63,14 @@ create table public.questions (
   bloom_level     int,
   bloom_label     text,
   question_text   text not null,
-  option_a        text not null,
-  option_b        text not null,
-  option_c        text not null,
-  option_d        text not null,
-  correct_answer  char(1) not null check (correct_answer in ('A','B','C','D')),
+  image_url       text,
+  model_answer    text,
+  max_marks       numeric(7,2),
+  option_a        text,
+  option_b        text,
+  option_c        text,
+  option_d        text,
+  correct_answer  char(1) check (correct_answer in ('A','B','C','D')),
   explanation     text,
   created_at      timestamptz default now()
 );
@@ -106,8 +110,28 @@ create table public.paper_questions (
   question_id     uuid not null references public.questions(id) on delete cascade,
   question_order  int not null,
   selected_answer char(1) check (selected_answer in ('A','B','C','D')),
+  answer_text     text,
   is_correct      boolean,
+  marks_awarded   numeric(7,2),
+  evaluation_feedback text,
+  evaluation_status text not null default 'not_started' check (evaluation_status in ('not_started','queued','processing','completed','failed')),
   created_at      timestamptz default now()
+);
+
+-- ── AI Evaluation Queue ─────────────────────────────────────
+-- Subjective submissions are evaluated serially by the application worker.
+create table public.ai_evaluation_jobs (
+  id              uuid primary key default uuid_generate_v4(),
+  paper_id        uuid not null references public.student_papers(id) on delete cascade,
+  paper_question_id uuid not null references public.paper_questions(id) on delete cascade,
+  status          text not null default 'queued' check (status in ('queued','processing','completed','failed')),
+  attempts        int not null default 0,
+  available_at    timestamptz not null default now(),
+  started_at      timestamptz,
+  completed_at    timestamptz,
+  last_error      text,
+  created_at      timestamptz default now(),
+  unique (paper_question_id)
 );
 
 -- ════════════════════════════════════════════════════════════
@@ -121,6 +145,7 @@ alter table public.questions         enable row level security;
 alter table public.assignments       enable row level security;
 alter table public.student_papers    enable row level security;
 alter table public.paper_questions   enable row level security;
+alter table public.ai_evaluation_jobs enable row level security;
 
 -- Helper: get current user's role
 create or replace function public.get_my_role()
@@ -221,10 +246,16 @@ create policy "Student updates own paper questions"
     exists (select 1 from public.student_papers sp where sp.id = paper_id and sp.student_id = auth.uid())
   );
 
+create policy "Service role manages evaluation jobs"
+  on public.ai_evaluation_jobs for all using (true) with check (true);
+
 -- ════════════════════════════════════════════════════════════
 -- Storage bucket for avatars
 -- ════════════════════════════════════════════════════════════
 insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true)
+on conflict do nothing;
+
+insert into storage.buckets (id, name, public) values ('question-images', 'question-images', true)
 on conflict do nothing;
 
 create policy "Authenticated users can upload own avatar"
@@ -236,4 +267,12 @@ create policy "Avatars are publicly readable"
 create policy "Users can update own avatar"
   on storage.objects for update using (
     bucket_id = 'avatars' and auth.uid() is not null
+  );
+
+create policy "Question images are publicly readable"
+  on storage.objects for select using (bucket_id = 'question-images');
+
+create policy "Teachers can upload question images"
+  on storage.objects for insert with check (
+    bucket_id = 'question-images' and auth.uid() is not null and get_my_role() = 'teacher'
   );
