@@ -90,6 +90,9 @@ export default function AssessmentsPage() {
                 <div>
                   <div className="assessment-tile-title">{a.name}</div>
                   <div style={{ marginTop: 6 }}>
+                    <span className="badge badge-blue" style={{ marginRight: 6 }}>
+                      {a.assessment_type === 'subjective' ? 'Subjective' : a.assessment_type === 'subjective_online' ? 'Subjective Online' : 'MCQ'}
+                    </span>
                     <span className={`badge ${a.is_active ? 'badge-green' : 'badge-gray'}`}>
                       {a.is_active ? '● Active' : '○ Inactive'}
                     </span>

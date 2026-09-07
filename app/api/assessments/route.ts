@@ -37,6 +37,10 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    const assessmentType = body.assessment_type ?? 'mcq'
+    if (!['mcq', 'subjective', 'subjective_online'].includes(assessmentType)) {
+      return NextResponse.json({ error: 'Invalid assessment type' }, { status: 400 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
       .from('assessments')
       .insert({
         name: body.name,
-        assessment_type: body.assessment_type ?? 'mcq',
+        assessment_type: assessmentType,
         total_questions: body.total_questions,
         total_time_seconds: body.total_time_seconds || null,
         time_per_question: body.time_per_question || null,
