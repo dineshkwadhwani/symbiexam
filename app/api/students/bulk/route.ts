@@ -25,8 +25,16 @@ export async function POST(req: NextRequest) {
 
     for (const s of students) {
       try {
-        const { data: existingUsers } = await admin.auth.admin.listUsers()
-        const existing = existingUsers?.users?.find((u: any) => u.email === s.email)
+        const email = s.email.trim().toLowerCase()
+        let existing: any
+        let page = 1
+        do {
+          const { data: existingUsers, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+          if (listError) throw listError
+          existing = existingUsers.users.find((user: any) => user.email?.toLowerCase() === email)
+          if (existing || existingUsers.users.length < 1000) break
+          page += 1
+        } while (!existing)
 
         let userId: string
 
@@ -39,13 +47,13 @@ export async function POST(req: NextRequest) {
               role: 'student', must_change_password: false
             })
           }
-          await admin.from('cohort_students').insert({ cohort_id, student_id: userId }).select()
-          pendingEmails.push({ type: 'cohort', email: s.email, name: profile?.full_name ?? s.full_name })
-          results.push({ email: s.email, status: 'exists' })
+          await admin.from('cohort_students').upsert({ cohort_id, student_id: userId }, { onConflict: 'cohort_id,student_id', ignoreDuplicates: true })
+          pendingEmails.push({ type: 'cohort', email, name: profile?.full_name ?? s.full_name })
+          results.push({ email, status: 'exists' })
         } else {
           const pw = generatePassword()
           const { data: newUser, error } = await admin.auth.admin.createUser({
-            email: s.email,
+            email,
             password: pw,
             email_confirm: true,
           })
@@ -62,8 +70,8 @@ export async function POST(req: NextRequest) {
             must_change_password: true,
           })
           await admin.from('cohort_students').insert({ cohort_id, student_id: userId })
-          pendingEmails.push({ type: 'welcome', email: s.email, name: s.full_name, password: pw })
-          results.push({ email: s.email, status: 'added' })
+          pendingEmails.push({ type: 'welcome', email, name: s.full_name, password: pw })
+          results.push({ email, status: 'added' })
         }
       } catch (e: any) {
         results.push({ email: s.email, status: 'error', error: e.message })
