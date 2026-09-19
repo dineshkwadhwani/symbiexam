@@ -392,34 +392,59 @@ function BulkUploadModal({ cohortId, cohortName, onClose, onDone }: any) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<any[]>([])
+  const [fileError, setFileError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    setRows([])
+    setResults([])
+    setFileError('')
     const reader = new FileReader()
+    reader.onerror = () => setFileError('Could not read this file. Please choose a valid .xlsx or .xls workbook.')
     reader.onload = (ev) => {
-      const wb = XLSX.read(ev.target?.result, { type: 'binary' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const json = XLSX.utils.sheet_to_json(ws)
-      const parsed = (json as any[]).map(r => ({
-        full_name: r['full_name'] || r['Full Name'] || r['name'] || '',
-        email: r['email'] || r['Email'] || '',
-        phone: r['phone'] || r['Phone'] || '',
-        prn_id: r['prn_id'] || r['PRN ID'] || r['PRN'] || '',
-      })).filter(r => r.full_name && r.email)
-      setRows(parsed)
+      try {
+        const wb = XLSX.read(ev.target?.result, { type: 'binary' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const json = XLSX.utils.sheet_to_json(ws)
+        const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/[ _-]+/g, '')
+        const parsed = (json as any[]).map(r => {
+          const columns = Object.fromEntries(Object.entries(r).map(([key, value]) => [normalize(key), value]))
+          return {
+            full_name: columns.fullname || columns.name || '',
+            email: columns.email || '',
+            phone: columns.phone || '',
+            prn_id: columns.prnid || columns.prn || '',
+          }
+        }).filter(r => r.full_name && r.email)
+        if (parsed.length === 0) {
+          setFileError('No valid students found. The first sheet must contain full_name and email columns, with a value in both for each student.')
+        }
+        setRows(parsed)
+      } catch {
+        setFileError('This workbook could not be parsed. Please download a fresh template and try again.')
+      }
     }
     reader.readAsBinaryString(file)
   }
 
   async function upload() {
     setLoading(true)
-    const res = await fetch('/api/students/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ students: rows, cohort_id: cohortId, cohort_name: cohortName }) })
-    const data = await res.json()
-    setResults(data.results ?? [])
-    setLoading(false)
-    toast.success(`Processed ${rows.length} students`)
+    try {
+      const res = await fetch('/api/students/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ students: rows, cohort_id: cohortId, cohort_name: cohortName }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setResults(data.results ?? [])
+      const failed = (data.results ?? []).filter((result: any) => result.status === 'error').length
+      if (failed > 0) toast.error(`${failed} student${failed === 1 ? '' : 's'} failed. See the error details below.`)
+      else toast.success(`Processed ${rows.length} students`)
+    } catch (error: any) {
+      setFileError(error.message || 'Upload failed. Please try again.')
+      toast.error(error.message || 'Upload failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -430,6 +455,7 @@ function BulkUploadModal({ cohortId, cohortName, onClose, onDone }: any) {
           {results.length === 0 ? (
             <>
               <div className="alert alert-info"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Excel must have columns: <strong>full_name</strong>, <strong>email</strong>, <strong>phone</strong> (optional), <strong>prn_id</strong> (optional)</div>
+              {fileError && <div className="alert alert-danger" role="alert">{fileError}</div>}
               <div className="upload-zone" onClick={() => fileRef.current?.click()}>
                 <div className="upload-zone-icon"><svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg></div>
                 <p><strong>Click to upload</strong> or drag and drop</p>
@@ -449,10 +475,12 @@ function BulkUploadModal({ cohortId, cohortName, onClose, onDone }: any) {
             </>
           ) : (
             <div>
-              <div className="badge badge-green" style={{ marginBottom: 12 }}>Upload complete</div>
+              <div className={`badge ${results.some(r => r.status === 'error') ? 'badge-red' : 'badge-green'}`} style={{ marginBottom: 12 }}>
+                {results.some(r => r.status === 'error') ? 'Upload completed with errors' : 'Upload complete'}
+              </div>
               <div style={{ maxHeight: 300, overflow: 'auto' }}>
-                <table className="table"><thead><tr><th>Email</th><th>Status</th></tr></thead>
-                  <tbody>{results.map((r, i) => <tr key={i}><td>{r.email}</td><td><span className={`badge ${r.status === 'added' ? 'badge-green' : r.status === 'exists' ? 'badge-amber' : 'badge-red'}`}>{r.status}</span></td></tr>)}</tbody>
+                <table className="table"><thead><tr><th>Email</th><th>Status</th><th>Error</th></tr></thead>
+                  <tbody>{results.map((r, i) => <tr key={i}><td>{r.email || 'Unknown email'}</td><td><span className={`badge ${r.status === 'added' ? 'badge-green' : r.status === 'exists' ? 'badge-amber' : 'badge-red'}`}>{r.status}</span></td><td>{r.error || '—'}</td></tr>)}</tbody>
                 </table>
               </div>
             </div>
